@@ -34,6 +34,19 @@ jobs:
         # which has an uppercase letter and is not a valid package name).
         run: flutter create --platforms=android --org com.maruthimotorpump --project-name warranty_app .
 
+      # Modern plugin implementations (e.g. shared_preferences_android) are built
+      # with Kotlin 1.9.x; bump the generated project's Kotlin so it can read them.
+      - name: Pin Kotlin version
+        run: |
+          if [ -f android/settings.gradle ]; then
+            sed -i -E 's/(id +"org\.jetbrains\.kotlin\.android" +version +")[0-9.]+(")/\11.9.24\2/' android/settings.gradle
+          fi
+          if [ -f android/build.gradle ]; then
+            sed -i -E "s/(ext\.kotlin_version *= *')[0-9.]+(')/\11.9.24\2/" android/build.gradle
+          fi
+          echo '----- kotlin refs -----'
+          grep -RniE 'kotlin(_version|\.android)' android/settings.gradle android/build.gradle 2>/dev/null || true
+
       # Release builds omit the INTERNET permission by default, but this app
       # talks to an HTTP API, so add it to the main manifest.
       - name: Add INTERNET permission
