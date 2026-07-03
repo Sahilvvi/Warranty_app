@@ -1,0 +1,73 @@
+name: Build Flutter APK
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.24.0'
+          channel: 'stable'
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      # This repo ships only lib/, assets/ and pubspec.yaml (no android/ folder),
+      # so generate the Android platform files before building.
+      - name: Generate Android project
+        run: flutter create --platforms=android --org com.maruthimotorpump .
+
+      # Release builds omit the INTERNET permission by default, but this app
+      # talks to an HTTP API, so add it to the main manifest.
+      - name: Add INTERNET permission
+        run: |
+          MANIFEST=android/app/src/main/AndroidManifest.xml
+          if ! grep -q 'android.permission.INTERNET' "$MANIFEST"; then
+            sed -i '/<manifest/a <uses-permission android:name="android.permission.INTERNET"/>' "$MANIFEST"
+          fi
+
+      # flutter_local_notifications 17.x requires Java 8+ core library desugaring.
+      - name: Enable core library desugaring
+        run: |
+          printf '\nandroid { compileOptions { coreLibraryDesugaringEnabled true } }\n' >> android/app/build.gradle
+          printf 'dependencies { coreLibraryDesugaring "com.android.tools:desugar_jdk_libs:2.0.4" }\n' >> android/app/build.gradle
+
+      - name: Build release APK
+        run: flutter build apk --release
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: warranty-app-release-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
+          retention-days: 30
+
+      # Publishes/updates a single "latest" GitHub Release with the APK attached,
+      # giving a permanent download link:
+      #   https://github.com/<owner>/<repo>/releases/latest/download/app-release.apk
+      - name: Publish APK to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: Latest APK build (#${{ github.run_number }})
+          files: build/app/outputs/flutter-apk/app-release.apk
+          body: |
+            Automated Flutter release APK.
+            Commit: ${{ github.sha }}
+            Built: run #${{ github.run_number }}
