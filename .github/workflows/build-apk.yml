@@ -47,6 +47,22 @@ jobs:
           echo '----- kotlin refs -----'
           grep -RniE 'kotlin(_version|\.android)' android/settings.gradle android/build.gradle 2>/dev/null || true
 
+      # compileSdk is pushed to 35 by modern plugins, but the template's AGP/Gradle are
+      # too old to parse android-35 resources (aapt2 error), so upgrade them.
+      - name: Upgrade Android Gradle Plugin and Gradle
+        run: |
+          if [ -f android/settings.gradle ]; then
+            sed -i -E 's/(id +"com\.android\.application" +version +")[0-9.]+(")/\18.6.0\2/' android/settings.gradle
+          fi
+          if [ -f android/build.gradle ]; then
+            sed -i -E 's#(com\.android\.tools\.build:gradle:)[0-9.]+#\18.6.0#' android/build.gradle
+          fi
+          if [ -f android/gradle/wrapper/gradle-wrapper.properties ]; then
+            sed -i -E 's#gradle-[0-9.]+-(all|bin)\.zip#gradle-8.7-all.zip#' android/gradle/wrapper/gradle-wrapper.properties
+          fi
+          echo '----- AGP/Gradle refs -----'
+          grep -RniE 'com.android.application|com.android.tools.build:gradle|distributionUrl' android/settings.gradle android/build.gradle android/gradle/wrapper/gradle-wrapper.properties 2>/dev/null || true
+
       # Release builds omit the INTERNET permission by default, but this app
       # talks to an HTTP API, so add it to the main manifest.
       - name: Add INTERNET permission
