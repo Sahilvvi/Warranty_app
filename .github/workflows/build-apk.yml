@@ -30,7 +30,9 @@ jobs:
       # This repo ships only lib/, assets/ and pubspec.yaml (no android/ folder),
       # so generate the Android platform files before building.
       - name: Generate Android project
-        run: flutter create --platforms=android --org com.maruthimotorpump .
+        # --project-name forces a valid Dart package name (the repo dir is "Warranty_app",
+        # which has an uppercase letter and is not a valid package name).
+        run: flutter create --platforms=android --org com.maruthimotorpump --project-name warranty_app .
 
       # Release builds omit the INTERNET permission by default, but this app
       # talks to an HTTP API, so add it to the main manifest.
